@@ -16,10 +16,21 @@ const (
 	ControlTypeBeheraPasswordPolicy   = "1.3.6.1.4.1.42.2.27.8.5.1"
 	ControlTypeVChuPasswordMustChange = "2.16.840.1.113730.3.4.4"
 	ControlTypeVChuPasswordWarning    = "2.16.840.1.113730.3.4.5"
+
+	ControlTypeChangeNotify = "1.2.840.113556.1.4.528"
+
+	// Active Directory extensions
+	ControlTypeDirSync   = "1.2.840.113556.1.4.841"
+	ControlTypeDirSyncEx = "1.2.840.113556.1.4.529"
+	ControlTypeDeleted   = "1.2.840.113556.1.4.417"
 )
 
 var ControlTypeMap = map[string]string{
 	ControlTypePaging:               "Paging",
+	ControlTypeDeleted:              "Deleted",
+	ControlTypeDirSync:              "DIRSYNC",
+	ControlTypeDirSyncEx:            "DIRSYNC EX",
+	ControlTypeChangeNotify:         "Change Notification",
 	ControlTypeBeheraPasswordPolicy: "Password Policy - Behera Draft",
 }
 
@@ -90,6 +101,130 @@ func (c *ControlPaging) String() string {
 }
 
 func (c *ControlPaging) SetCookie(cookie []byte) {
+	c.Cookie = cookie
+}
+
+type ControlDirSync struct {
+	Criticality       bool
+	Flags             uint64
+	MaxAttributeCount uint64
+	Cookie            []byte
+}
+
+func (c *ControlDirSync) GetControlType() string {
+	return ControlTypeDirSync
+}
+
+func (c *ControlDirSync) Encode() *ber.Packet {
+	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "Control")
+	packet.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, ControlTypeDirSync, "Control Type ("+ControlTypeMap[ControlTypeDirSync]+")"))
+
+	p2 := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Control Value (DIRSYNC)")
+	seq := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "DIRSYNC Control Value")
+
+	seq.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, uint64(c.Flags), "Flags"))
+	seq.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, uint64(c.MaxAttributeCount), "MaxAttributeCount"))
+
+	cookie := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Cookie")
+	cookie.Value = c.Cookie
+	cookie.Data.Write(c.Cookie)
+	seq.AppendChild(cookie)
+
+	p2.AppendChild(seq)
+
+	if c.Criticality {
+		packet.AppendChild(ber.NewBoolean(ber.ClassUniversal, ber.TypePrimitive, ber.TagBoolean, c.Criticality, "Criticality"))
+	}
+	packet.AppendChild(p2)
+	return packet
+}
+
+func (c *ControlDirSync) String() string {
+	return fmt.Sprintf(
+		"Control Type: %s (%q) Criticality:%v Flags:%v MaxAttributeCount:%v Cookie:%s",
+		ControlTypeMap[ControlTypeDirSync],
+		ControlTypeDirSync,
+		c.Criticality,
+		c.Flags,
+		c.MaxAttributeCount,
+		c.Cookie)
+}
+
+func (c *ControlDirSync) SetCookie(cookie []byte) {
+	c.Cookie = cookie
+}
+
+type ControlDirSyncEx struct {
+	Flag uint64
+}
+
+func (c *ControlDirSyncEx) GetControlType() string {
+	return ControlTypeDirSyncEx
+}
+
+func (c *ControlDirSyncEx) Encode() *ber.Packet {
+	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "Control")
+	packet.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, ControlTypeDirSyncEx, "Control Type ("+ControlTypeMap[ControlTypeDirSyncEx]+")"))
+
+	p2 := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Control Value (DIRSYNC EX)")
+	seq := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "Search Control Value")
+
+	seq.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, uint64(c.Flag), "Flag"))
+
+	p2.AppendChild(seq)
+
+	packet.AppendChild(ber.NewBoolean(ber.ClassUniversal, ber.TypePrimitive, ber.TagBoolean, true, "Criticality"))
+	packet.AppendChild(p2)
+	return packet
+}
+
+func (c *ControlDirSyncEx) String() string {
+	return fmt.Sprintf(
+		"Control Type: %s (%q)  Criticality: %t Flag: %d",
+		ControlTypeMap[ControlTypeDirSyncEx],
+		ControlTypeDirSyncEx,
+		true,
+		c.Flag)
+}
+
+type ControlChangeNotify struct {
+	Criticality bool
+	Cookie      []byte
+}
+
+func (c *ControlChangeNotify) GetControlType() string {
+	return ControlTypeChangeNotify
+}
+
+func (c *ControlChangeNotify) Encode() *ber.Packet {
+	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "Control")
+	packet.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, ControlTypeChangeNotify, "Control Type ("+ControlTypeMap[ControlTypeChangeNotify]+")"))
+
+	p2 := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Control Value (Change Notification)")
+	seq := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "Search Control Value")
+	cookie := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Cookie")
+	cookie.Value = c.Cookie
+	cookie.Data.Write(c.Cookie)
+	seq.AppendChild(cookie)
+	p2.AppendChild(seq)
+
+	if c.Criticality {
+		packet.AppendChild(ber.NewBoolean(ber.ClassUniversal, ber.TypePrimitive, ber.TagBoolean, c.Criticality, "Criticality"))
+	}
+	packet.AppendChild(p2)
+	return packet
+}
+
+func (c *ControlChangeNotify) String() string {
+	return fmt.Sprintf(
+		"Control Type: %s (%q)  Criticality: %t  Cookie: %q",
+		ControlTypeMap[ControlTypeChangeNotify],
+		ControlTypeChangeNotify,
+		c.Criticality,
+		c.Cookie)
+}
+
+func (c *ControlChangeNotify) SetCookie(cookie []byte) {
 	c.Cookie = cookie
 }
 
@@ -205,6 +340,25 @@ func DecodeControl(packet *ber.Packet) Control {
 		c.Cookie = value.Children[1].Data.Bytes()
 		value.Children[1].Value = c.Cookie
 		return c
+	case ControlTypeDirSync:
+		value.Description += " (DIRSYNC)"
+		c := new(ControlDirSync)
+		if value.Value != nil {
+			valueChildren := ber.DecodePacket(value.Data.Bytes())
+			value.Data.Truncate(0)
+			value.Value = nil
+			value.AppendChild(valueChildren)
+		}
+		value = value.Children[0]
+		value.Description = "Search Control Value"
+		value.Children[0].Description = "Flags"
+		value.Children[1].Description = "MaxAttributeCount"
+		value.Children[2].Description = "Cookie"
+		c.Flags = uint64(value.Children[0].Value.(int64))
+		c.MaxAttributeCount = uint64(value.Children[1].Value.(int64))
+		c.Cookie = value.Children[2].Data.Bytes()
+		value.Children[2].Value = c.Cookie
+		return c
 	case ControlTypeBeheraPasswordPolicy:
 		value.Description += " (Password Policy - Behera)"
 		c := NewControlBeheraPasswordPolicy()
@@ -281,6 +435,23 @@ func NewControlString(controlType string, criticality bool, controlValue string)
 
 func NewControlPaging(pagingSize uint32) *ControlPaging {
 	return &ControlPaging{PagingSize: pagingSize}
+}
+
+func NewControlDirSync(flags, maxAttributes uint64, cookie []byte) *ControlDirSync {
+	return &ControlDirSync{
+		Criticality:       true,
+		Flags:             flags,
+		MaxAttributeCount: maxAttributes,
+		Cookie:            cookie,
+	}
+}
+
+func NewControlDirSyncEx(flag uint64) *ControlDirSyncEx {
+	return &ControlDirSyncEx{Flag: flag}
+}
+
+func NewControlChangeNotify() *ControlChangeNotify {
+	return &ControlChangeNotify{Criticality: true}
 }
 
 func NewControlBeheraPasswordPolicy() *ControlBeheraPasswordPolicy {
