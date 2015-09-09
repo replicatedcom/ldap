@@ -95,10 +95,6 @@ func DecodeControl(packet *ber.Packet) Control {
 		result := &ControlContentSyncState{}
 		result.decode(criticality, value)
 		return result
-	case ControlTypeContentSyncDone:
-		result := &ControlContentSyncDone{}
-		result.decode(criticality, value)
-		return result
 	default:
 		result := new(ControlString)
 		result.ControlType = controlType
