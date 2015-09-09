@@ -51,6 +51,10 @@ type Conn struct {
 	once                sync.Once
 	outstandingRequests uint
 	messageMutex        sync.Mutex
+
+	entryCallback   func(entry *Entry, controls []Control) error
+	cookieCallback  func([]byte) error
+	referalCallback func(string) error
 }
 
 // DefaultTimeout is a package-level variable that sets the timeout value

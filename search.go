@@ -164,6 +164,7 @@ type SearchResult struct {
 	Entries   []*Entry
 	Referrals []string
 	Controls  []Control
+	Cookie    []byte
 }
 
 func (s *SearchResult) Print() {
@@ -348,7 +349,26 @@ func (l *Conn) Search(searchRequest *SearchRequest) (*SearchResult, error) {
 				}
 				entry.Attributes = append(entry.Attributes, attr)
 			}
-			result.Entries = append(result.Entries, entry)
+
+			entryControls := make([]Control, 0)
+			if len(packet.Children) == 3 {
+				for _, child := range packet.Children[2].Children {
+					entryControls = append(entryControls, DecodeControl(child))
+				}
+			}
+
+			// During Content Sync, this function will run for indefintie periods of time,
+			// so it's dangerous to accumulate all results in the lists.  Use the callbacks instead
+			// to deliver results to the caller.
+			if l.entryCallback != nil {
+				if err := l.entryCallback(entry, entryControls); err != nil {
+					return nil, fmt.Errorf("entryCallback error, terminating search:%v", err)
+				}
+			} else {
+				result.Entries = append(result.Entries, entry)
+				result.Controls = append(result.Controls, entryControls...)
+			}
+
 		case 5:
 			resultCode, resultDescription := getLDAPResultCode(packet)
 			if resultCode != 0 {
@@ -361,7 +381,29 @@ func (l *Conn) Search(searchRequest *SearchRequest) (*SearchResult, error) {
 			}
 			foundSearchResultDone = true
 		case 19:
-			result.Referrals = append(result.Referrals, packet.Children[1].Children[0].Value.(string))
+			if l.cookieCallback != nil {
+				if err := l.referalCallback(packet.Children[1].Children[0].Value.(string)); err != nil {
+					return nil, fmt.Errorf("referalCallback error, terminating search:%v", err)
+				}
+			} else {
+				result.Referrals = append(result.Referrals, packet.Children[1].Children[0].Value.(string))
+			}
+		case 25:
+			if string(packet.Children[1].Children[0].Data.Bytes()) == ControlTypeContentSyncInfo {
+				child := ber.DecodePacket(packet.Children[1].Children[1].Data.Bytes())
+				// TODO: RFC 4533 -- 2.5. Sync Info Message -- more choices are possible
+				if len(child.Children) > 0 {
+					if l.cookieCallback != nil {
+						if err := l.cookieCallback(child.Children[0].ByteValue); err != nil {
+							return nil, fmt.Errorf("cookieCallback error, terminating search:%v", err)
+						}
+					} else {
+						result.Cookie = child.Children[0].ByteValue
+					}
+				}
+			}
+		default:
+			l.Debug.Printf("%d: unknown tag: %v", messageID, packet.Children[1].Tag)
 		}
 	}
 	l.Debug.Printf("%d: returning", messageID)

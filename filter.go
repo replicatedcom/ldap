@@ -255,7 +255,7 @@ func compileFilter(filter string, pos int) (*ber.Packet, int, error) {
 						err = NewError(ErrorFilterCompile, errors.New("ldap: missing characters for escape in filter"))
 						return packet, newPos, err
 					}
-					if escByte, decodeErr := hexpac.DecodeString(condition[i+1:i+3]); decodeErr != nil {
+					if escByte, decodeErr := hexpac.DecodeString(condition[i+1 : i+3]); decodeErr != nil {
 						err = NewError(ErrorFilterCompile, errors.New("ldap: invalid characters for escape in filter"))
 						return packet, newPos, err
 					} else {
