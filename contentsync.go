@@ -35,6 +35,12 @@ func GetContentSyncRequest(baseDn string, cookie []byte) *SearchRequest {
 
 func (l *Conn) RunContentSync(searchRequest *SearchRequest, entryCallback EntryCallback, cookieCallback CookieCallback) error {
 	l.entryCallback = func(entry *Entry, controls []Control) error {
+
+		if len(controls) == 0 {
+			// FreeIPA sends duplicate objects in "compatability" mode.  These won't have any controls.
+			return nil
+		}
+
 		control, err := getContentSyncStateControl(controls)
 		if err != nil {
 			return err
