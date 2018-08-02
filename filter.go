@@ -60,8 +60,11 @@ func CompileFilter(filter string) (*ber.Packet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if pos != len(filter) {
+	if pos < len(filter) {
 		return nil, NewError(ErrorFilterCompile, errors.New("ldap: finished compiling filter with extra at end: "+fmt.Sprint(filter[pos:])))
+	}
+	if pos != len(filter) {
+		return nil, NewError(ErrorFilterCompile, errors.New("ldap: filter has too many opening parentheses"))
 	}
 	return packet, nil
 }
