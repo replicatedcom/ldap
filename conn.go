@@ -180,7 +180,12 @@ func (l *Conn) StartTLS(config *tls.Config) error {
 		ber.PrintPacket(packet)
 	}
 
-	if packet.Children[1].Children[0].Value.(int64) == LDAPResultSuccess {
+	status, ok := getValueFromPacket(packet)
+	if !ok {
+		return fmt.Errorf("ldap: received unexpected response while starting TLS")
+	}
+
+	if status == LDAPResultSuccess {
 		conn := tls.Client(l.conn, config)
 
 		if err := conn.Handshake(); err != nil {
@@ -194,12 +199,29 @@ func (l *Conn) StartTLS(config *tls.Config) error {
 		// https://tools.ietf.org/html/rfc4511#section-4.1.9
 		// Children[1].Children[2] is the diagnosticMessage which is guaranteed to exist.
 		return NewError(
-			uint8(packet.Children[1].Children[0].Value.(int64)),
+			uint8(status),
 			fmt.Errorf("ldap: cannot StartTLS (%s)", packet.Children[1].Children[2].Value.(string)))
 	}
 	go l.reader()
 
 	return nil
+}
+
+func getValueFromPacket(p *ber.Packet) (int64, bool) {
+	if p == nil {
+		return 0, false
+	}
+	if len(p.Children) < 2 || p.Children[1] == nil {
+		return 0, false
+	}
+	if len(p.Children[1].Children) < 1 || p.Children[1].Children[0] == nil {
+		return 0, false
+	}
+	if p.Children[1].Children[0].Value == nil {
+		return 0, false
+	}
+	v, ok := p.Children[1].Children[0].Value.(int64)
+	return v, ok
 }
 
 func (l *Conn) sendMessage(packet *ber.Packet) (chan *ber.Packet, error) {
