@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-func GetDirSyncRequest(baseDn string, cookie []byte) *SearchRequest {
-	filter := "(objectclass=*)"
+func GetDirSyncRequest(baseDn, filter string, cookie []byte) *SearchRequest {
 	sizeLimit := 0
 	timeLimit := 0
 	typesOnly := false
