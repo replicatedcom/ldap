@@ -10,8 +10,7 @@ const (
 	refreshAndPersist = 3
 )
 
-func GetContentSyncRequest(baseDn string, cookie []byte) *SearchRequest {
-	filter := "(objectclass=*)"
+func GetContentSyncRequest(baseDn, filter string, cookie []byte) *SearchRequest {
 	sizeLimit := 0
 	timeLimit := 0
 	typesOnly := false
